@@ -1,0 +1,172 @@
+From 2cd9874d128423c92314324abc7ee0fd7923afcf Mon Sep 17 00:00:00 2001
+From: Larry Finger <Larry.Finger@lwfinger.net>
+Date: Wed, 2 Feb 2022 16:19:54 -0600
+Subject: [PATCH] rtl8723bu: Fix build under kernel 5.17 and clean up some
+ warnings
+
+Signed-off-by: Larry Finger <Larry.Finger@lwfinger.net>
+---
+ hal/rtl8723bu_recv.c          |  4 ++--
+ hal/rtl8723bu_xmit.c          |  2 +-
+ include/osdep_service_linux.h |  5 ++++-
+ os_dep/ioctl_linux.c          |  2 +-
+ os_dep/os_intfs.c             |  4 ++++
+ os_dep/osdep_service.c        |  4 ++++
+ os_dep/rtw_android.c          |  2 +-
+ os_dep/rtw_proc.c             | 24 ++++++++++++++++++++++++
+ 8 files changed, 41 insertions(+), 6 deletions(-)
+
+diff --git a/hal/rtl8723bu_recv.c b/hal/rtl8723bu_recv.c
+index b1eae8a..a2fc82b 100644
+--- a/hal/rtl8723a/sdio/rtl8723as_recv.c
++++ b/hal/rtl8723a/sdio/rtl8723as_recv.c
+@@ -51,8 +51,8 @@ int	rtl8723bu_init_recv_priv(_adapter *padapter)
+ 	//3 2. init tasklet
+ #ifdef PLATFORM_LINUX
+ 	tasklet_init(&precvpriv->recv_tasklet,
+-	     (void(*)(unsigned long))rtl8723as_recv_tasklet,
+-	     (unsigned long)padapter);
++		     (void( *))rtl8723as_recv_tasklet,
++		     (unsigned long)padapter);
+ #endif
+ 
+ 	goto exit;
+diff --git a/include/osdep_service.h b/include/osdep_service.h
+index c0e08fd..911c448 100644
+--- a/include/osdep_service.h
++++ b/include/osdep_service.h
+@@ -130,8 +130,11 @@
+ 	typedef int		thread_return;
+ 	typedef void*	thread_context;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	#define thread_exit() complete_and_exit(NULL, 0)
+-
++#else
++	#define thread_exit() kthread_complete_and_exit(NULL, 0)
++#endif
+ 	typedef void timer_hdl_return;
+ 	typedef void* timer_hdl_context;
+ 
+diff --git a/os_dep/os_intfs.c b/os_dep/os_intfs.c
+index 8747133..597976c 100644
+--- a/os_dep/linux/os_intfs.c
++++ b/os_dep/linux/os_intfs.c
+@@ -2102,7 +2102,11 @@ static int _rtw_drv_register_netdev(_adapter *padapter, char *name)
+ 	/* alloc netdev name */
+ 	rtw_init_netdev_name(pnetdev, name);
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	_rtw_memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
++#else
++	dev_addr_set(pnetdev, padapter->eeprompriv.mac_addr);
++#endif
+ 
+ 	/* Tell the network stack we exist */
+ 	if (register_netdev(pnetdev) != 0) {
+diff --git a/os_dep/osdep_service.c b/os_dep/osdep_service.c
+index 403ceef..545d00d 100644
+--- a/os_dep/osdep_service.c
++++ b/os_dep/osdep_service.c
+@@ -970,7 +970,11 @@ int rtw_change_ifname(_adapter *padapter, const char *ifname)
+ 
+ 	rtw_init_netdev_name(pnetdev, ifname);
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	_rtw_memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
++#else
++	dev_addr_set(pnetdev, padapter->eeprompriv.mac_addr);
++#endif
+ 
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26))
+ 	if(!rtnl_is_locked())
+diff --git a/os_dep/rtw_android.c b/os_dep/rtw_android.c
+index 0a181c5..bf45f9e 100644
+--- a/os_dep/linux/rtw_android.c
++++ b/os_dep/linux/rtw_android.c
+@@ -404,7 +404,7 @@ static int rtw_android_get_p2p_dev_addr(struct net_device *net, char *command, i
+ 	int bytes_written = 0;
+ 
+ 	//We use the same address as our HW MAC address
+-	_rtw_memcpy(command, net->dev_addr, ETH_ALEN);
++	_rtw_memcpy(command, (void *)net->dev_addr, ETH_ALEN);
+ 	
+ 	bytes_written = ETH_ALEN;
+ 	return bytes_written;
+
+diff --git a/os_dep/rtw_proc.c b/os_dep/rtw_proc.c
+index 6d4159a..dff3598 100644
+--- a/os_dep/linux/rtw_proc.c
++++ b/os_dep/linux/rtw_proc.c
+@@ -141,7 +141,11 @@ static const int drv_proc_hdls_num = sizeof(drv_proc_hdls) / sizeof(struct rtw_p
+ 
+ static int rtw_drv_proc_open(struct inode *inode, struct file *file)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	//struct net_device *dev = proc_get_parent_data(inode);
+ 	ssize_t index = (ssize_t)PDE_DATA(inode);
++#else
++	ssize_t index = (ssize_t)pde_data(inode);
++#endif
+ 	const struct rtw_proc_hdl *hdl = drv_proc_hdls+index;
+ 	return single_open(file, hdl->show, NULL);
+@@ -149,7 +153,11 @@ static int rtw_drv_proc_open(struct inode *inode, struct file *file)
+ 
+ static ssize_t rtw_drv_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
++#else
++	ssize_t index = (ssize_t)pde_data(file_inode(file));
++#endif
+ 	const struct rtw_proc_hdl *hdl = drv_proc_hdls+index;
+ 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
+ 
+@@ -522,7 +530,11 @@ static const int adapter_proc_hdls_num = sizeof(adapter_proc_hdls) / sizeof(stru
+ 
+ static int rtw_adapter_proc_open(struct inode *inode, struct file *file)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	ssize_t index = (ssize_t)PDE_DATA(inode);
++#else
++	ssize_t index = (ssize_t)pde_data(inode);
++#endif
+ 	const struct rtw_proc_hdl *hdl = adapter_proc_hdls+index;
+ 
+ 	return single_open(file, hdl->show, proc_get_parent_data(inode));
+@@ -530,7 +542,11 @@ static int rtw_adapter_proc_open(struct inode *inode, struct file *file)
+ 
+ static ssize_t rtw_adapter_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
++#else
++	ssize_t index = (ssize_t)pde_data(file_inode(file));
++#endif
+ 	const struct rtw_proc_hdl *hdl = adapter_proc_hdls+index;
+ 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
+ 
+@@ -714,7 +730,11 @@ static const int odm_proc_hdls_num = sizeof(odm_proc_hdls) / sizeof(struct rtw_p
+ 
+ static int rtw_odm_proc_open(struct inode *inode, struct file *file)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	ssize_t index = (ssize_t)PDE_DATA(inode);
++#else
++	ssize_t index = (ssize_t)pde_data(inode);
++#endif
+ 	const struct rtw_proc_hdl *hdl = odm_proc_hdls+index;
+ 
+ 	return single_open(file, hdl->show, proc_get_parent_data(inode));
+@@ -722,7 +742,11 @@ static int rtw_odm_proc_open(struct inode *inode, struct file *file)
+ 
+ static ssize_t rtw_odm_proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *pos)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0)
+ 	ssize_t index = (ssize_t)PDE_DATA(file_inode(file));
++#else
++	ssize_t index = (ssize_t)pde_data(file_inode(file));
++#endif
+ 	const struct rtw_proc_hdl *hdl = odm_proc_hdls+index;
+ 	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *, void *) = hdl->write;
+ 
