@@ -35,7 +35,9 @@ extern void extern_wifi_set_enable(int is_on);
 #endif//for AML
 
 #if 1//for RK
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 #include <linux/rfkill-wlan.h>
+#endif 
 #endif//for RK
 
 #if 0//for allwinner
@@ -2082,7 +2084,9 @@ static void __exit rtw_drv_halt(void)
 
 #if 1
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0))
 #include <linux/rfkill-wlan.h>
+#endif
 extern int get_wifi_chip_type(void);
 #else
 extern int rk29sdk_wifi_power(int on);
