@@ -4398,7 +4398,12 @@ static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *nd
 	return ret;
 }
 
-static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(5, 19, 1))
+static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev)i
+#else
+static int cfg80211_rtw_stop_ap(struct wiphy *wiphy, struct net_device *ndev,
+                                unsigned int link_id)
+#endif
 {
 	DBG_871X(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 	return 0;
