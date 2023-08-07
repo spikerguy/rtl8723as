@@ -1808,11 +1808,15 @@ static int isFileReadable(char *path)
 		ret = PTR_ERR(fp);
 	}
 	else {
-		oldfs = get_fs(); set_fs(KERNEL_DS);	
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+		oldfs = get_fs(); set_fs(KERNEL_DS);
+#endif
 		if(1!=readFile(fp, &buf, 1))
 			ret = PTR_ERR(fp);
 		
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 		set_fs(oldfs);
+#endif
 		filp_close(fp,NULL);
 	}	
 	return ret;
@@ -1837,9 +1841,13 @@ static int retriveFromFile(char *path, u8* buf, u32 sz)
 		if( 0 == (ret=openFile(&fp,path, O_RDONLY, 0)) ){
 			DBG_871X("%s openFile path:%s fp=%p\n",__FUNCTION__, path ,fp);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 			oldfs = get_fs(); set_fs(KERNEL_DS);
+#endif
 			ret=readFile(fp, buf, sz);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 			set_fs(oldfs);
+#endif
 			closeFile(fp);
 			
 			DBG_871X("%s readFile, ret:%d\n",__FUNCTION__, ret);
@@ -1873,9 +1881,13 @@ static int storeToFile(char *path, u8* buf, u32 sz)
 		if( 0 == (ret=openFile(&fp, path, O_CREAT|O_WRONLY, 0666)) ) {
 			DBG_871X("%s openFile path:%s fp=%p\n",__FUNCTION__, path ,fp);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 			oldfs = get_fs(); set_fs(KERNEL_DS);
+#endif
 			ret=writeFile(fp, buf, sz);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
 			set_fs(oldfs);
+#endif
 			closeFile(fp);
 
 			DBG_871X("%s writeFile, ret:%d\n",__FUNCTION__, ret);
