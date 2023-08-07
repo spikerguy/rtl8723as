@@ -3207,8 +3207,6 @@ static int cfg80211_rtw_leave_ibss(struct wiphy *wiphy, struct net_device *ndev)
 
 	DBG_871X(FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 
-	padapter->mlmepriv.not_indic_disco = _TRUE;
-	
 	old_type = rtw_wdev->iftype;
 	
 	rtw_set_roaming(padapter, 0);
@@ -3230,8 +3228,6 @@ static int cfg80211_rtw_leave_ibss(struct wiphy *wiphy, struct net_device *ndev)
 	}
 
 leave_ibss:
-	padapter->mlmepriv.not_indic_disco = _FALSE;
-
 	return 0;
 }
 
@@ -3256,7 +3252,6 @@ static int cfg80211_rtw_connect(struct wiphy *wiphy, struct net_device *ndev,
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	_queue *queue = &pmlmepriv->scanned_queue;	
 
-	padapter->mlmepriv.not_indic_disco = _TRUE;
 	
 	DBG_871X("=>"FUNC_NDEV_FMT"\n", FUNC_NDEV_ARG(ndev));
 	DBG_871X("privacy=%d, key=%p, key_len=%d, key_idx=%d\n",
@@ -3483,7 +3478,6 @@ exit:
 
 	DBG_8192C("<=%s, ret %d\n",__FUNCTION__, ret);
 
-	padapter->mlmepriv.not_indic_disco = _FALSE;
 
 	return ret;
 }
